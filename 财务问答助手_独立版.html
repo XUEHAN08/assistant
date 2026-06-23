@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>财务问答助手</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vuetify@3.7.19/dist/vuetify.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0,1">
+    <style>
+        .suggestion-item:hover { background: #e3f2fd !important; }
+        [class*="material-symbols"] { font-size: 1.25em; vertical-align: middle; }
+    </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vuetify@3.7.19/dist/vuetify.min.js"></script>
+
+<script>
+// ==================== QA 数据 ====================
+const QA_DATA = [
+    {keywords:["OA付款日期","最早支付日期","提前付款","最早什么时候能付款","OA哪天付款","付款时间"],question:"OA付款日期以什么为准？如何申请提前付款？",answer:"财务付款以OA最早支付日期为准，如遇节假日/周末则顺延下一工作日。\n\n如需提前支付，有两种方式：\n1️⃣ 退回至申请人修改日期，重走OA审批流程\n2️⃣ 发邮件给BUFC说明情况申请提前付款，同时抄送 paymentsupport@trip.com 及财务付款节点的处理人"},
+    {keywords:["OA付款失败","付款失败","账户信息错误","账号错误","付款不成功","付款被拒","付款退回","打款失败"],question:"OA付款失败怎么办？",answer:"多数情况因收款账户信息错误导致。请检查户名/账号/开户行是否正确：\n\n❌ 不正确 → 在付款失败OA单详情页点击「创建付款失败账号变更单」填写正确信息后提交\n✅ 正确 → 联系资金部 PaymentSupport@trip.com 邮箱说明情况排查原因"},
+    {keywords:["合同付款单","合同付款失败","采购合同","合同付款","直连付款失败"],question:"合同付款单付款失败怎么处理？",answer:"① 先创建「付款失败账号变更单」重新发起付款\n② 如果后续还要提交合同付款单支付剩余款项，务必先提交「采购合同账户信息变更单」修改采购合同评审单中的收款账户信息\n\n⚠️ 否则后续仍会直连付款失败！"},
+    {keywords:["业务款付款失败","其他来源付款失败","单据日志","支付异常","BU结算","支付失败"],question:"其他来源业务款付款失败怎么办？",answer:"请至单据日志页面查看原因：\n\n📌 显示「支付失败」（账号长度非法/户名错误/账号校验错等）\n→ 联系供应商及开户行核对账户信息（户名、账号、开户行到支行、联行号）\n\n📌 显示「支付异常」（Over the limit time updated to C）\n→ 邮件联系对应资金同事"},
+    {keywords:["付款水单","回单下载","银行回单","付款回单","电子回单","水单","怎么下载回单"],question:"如何下载付款回单/水单？",answer:"📄 OA回单：收到飞书/邮件付款成功的消息后，等待 20-60 分钟，根据通知指引自行下载\n\n📄 其他来源业务款回单：联系BU财务结算至资金流水池下载"},
+    {keywords:["到账时间","多久到账","未到账","什么时候到账","几天到账","到账"],question:"付款后多久到账？",answer:"一般 3 天内到账，具体看各银行处理速度。"},
+    {keywords:["账户填错","支付成功未到账","户名错误","钱没到账","账号填错","信息错误但支付成功","系统显示成功没收到钱"],question:"账户信息填错但显示支付成功，钱没到账怎么办？",answer:"🔹 OA：等待飞书/邮件返回失败信息，按指引提交付款失败变更单；若 3 天内没有返回失败，请联系审批最后节点的财务付款同事\n\n🔹 其他来源业务款：BU结算前往「银行明细查询」查询是否有退单（退单一般 1-3 天）\n  - 有退单记录：提供付款单号及退单记录发邮件给对应资金同事\n  - 无退单记录：联系供应商提供账户交易明细邮件至对应资金同事"},
+    {keywords:["备注长度","备注限制","备注字符","备注20","字符限制","备注字数"],question:"OA付款备注的长度有什么要求？",answer:"最多支持 20 个字符\n• 1 个中文 = 2 个字符\n• 1 个英文/数字/符号 = 1 个字符\n\n例如：「携程*AB12」= 9 个字符\n\n若备注超过限制，请及时查看OA并回复会签。"},
+    {keywords:["个人户名","修改户名","户名有误","户名不对","报销户名","HR系统户名"],question:"报销信息中的个人户名有误，如何修改？",answer:"员工本人户名从HR系统获取，无法自行修改。\n\n请在以下链接申请修改：\nhttp://iquality.ctripcorp.com/feedback/submit?pid=9&typeId=1846"},
+    {keywords:["开户行","联行号","查询开户行","开户行信息","支行信息"],question:"如何查询开户行联行号等信息？",answer:"请新建一个费用报销单，按下单中红色字体/方框指示进行查询。"},
+    {keywords:["审批流","预计审批人","审批节点","OA审批","当前审批人","审批到哪了","查看审批"],question:"如何查询OA审批流？",answer:"在表单详情页的「状态」字段中，点击「查看预计审批人」，就可以看到待审批的节点和当前审批人。"},
+    {keywords:["公司税号","税号","开票信息","发票抬头","纳税人识别号"],question:"如何查询公司税号等信息？",answer:"在飞书搜索「财务税号」即可查询相关信息。"},
+    {keywords:["误打款","退回错误汇款","误打","打错了","汇错了","多打了"],question:"供应商/个人误打款，如何申请退回？",answer:"在OA系统提交「综合业务付款单」，业务类型选择「退回错误汇款」。"},
+    {keywords:["退押金","退保证金","押金","保证金","押金怎么退"],question:"如何申请退押金/保证金？",answer:"在OA系统提交「综合业务付款单」，业务类型选择「退回押金/保证金/本金」。"},
+    {keywords:["发票","发票审核","发票问题","发票审核员","发票怎么开"],question:"发票相关问题找谁？",answer:"联系发票审核员（可查看OA审批流中的发票节点）或 BU 财务。"},
+    {keywords:["退回报销款","部分报销款","退还报销","退款给公司","报销退钱"],question:"需要退回部分报销款给公司怎么办？",answer:"① 申请人网页端打开OA\n② 找到电子回单部分\n③ 按回单里的公司信息，原路退还公司\n④ 告知对应公司的账务同事"},
+    {keywords:["退单记录","银行退单","退单查询","退单","被银行退回了"],question:"如何查询退单记录？",answer:"BU结算前往「银行明细查询」查询是否有退单，退单一般需要 1-3 天。\n\n🔹 如有退单记录：提供付款单号及退单记录发邮件给对应资金同事\n🔹 如确认无退单记录：联系供应商提供账户交易明细邮件至对应资金同事"}
+];
+
+// ==================== 匹配引擎 ====================
+function scoreKeyword(text, item) {
+    let s = 0;
+    for (const kw of item.keywords) {
+        if (text.includes(kw)) s += Math.min(kw.length / 2, 20);
+    }
+    return s;
+}
+function scoreCharOverlap(text, searchable) {
+    const tc = new Set([...text].filter(c => c >= '一' && c <= '鿿' || /[a-zA-Z0-9]/.test(c)));
+    if (!tc.size) return 0;
+    const sc = new Set(searchable);
+    const o = [...tc].filter(c => sc.has(c)).length;
+    return o / tc.size * 100 + o * 0.5;
+}
+function bigram(str) {
+    const chars = [...str].filter(c => c >= '一' && c <= '鿿');
+    const bg = new Set();
+    for (let i = 0; i < chars.length - 1; i++) bg.add(chars[i] + chars[i+1]);
+    return bg;
+}
+function scoreBigram(text, searchable) {
+    const ib = bigram(text);
+    if (!ib.size) return 0;
+    const sb = bigram(searchable);
+    const o = [...ib].filter(b => sb.has(b)).length;
+    return o / ib.size * 100;
+}
+function scoreFuzzy(text, kwText) {
+    const tc = new Set([...text].filter(c => c >= '一' && c <= '鿿' || /[a-zA-Z0-9]/.test(c)));
+    if (!tc.size) return 0;
+    const sc = new Set(kwText);
+    const h = [...tc].filter(c => sc.has(c)).length;
+    return h / tc.size * 100;
+}
+
+function matchQA(input) {
+    const t = input.trim();
+    if (!t) return null;
+    const scored = QA_DATA.map(item => {
+        const st = item.keywords.join(' ') + ' ' + item.question;
+        const s1 = scoreKeyword(t, item);
+        const s2 = scoreCharOverlap(t, st);
+        const s3 = scoreBigram(t, st);
+        const s4 = scoreFuzzy(t, st);
+        return { total: s1 * 2 + s2 * 0.3 + s3 * 0.6 + s4 * 0.5, item };
+    });
+    scored.sort((a, b) => b.total - a.total);
+    return scored[0]?.total >= 6 ? scored[0].item : null;
+}
+
+function suggestQA(input, n = 3) {
+    const t = input.trim();
+    if (!t) return [];
+    const scored = QA_DATA.map(item => {
+        const st = item.keywords.join(' ') + ' ' + item.question;
+        const s2 = scoreCharOverlap(t, st);
+        const s3 = scoreBigram(t, st);
+        const s4 = scoreFuzzy(t, st);
+        return { total: s3 * 0.5 + s4 * 0.3 + s2 * 0.2, item };
+    });
+    scored.sort((a, b) => b.total - a.total);
+    return scored.filter(s => s.total > 10).slice(0, n).map(s => s.item);
+}
+
+// ==================== Vue App ====================
+const { createApp, ref, computed } = Vue;
+
+const app = createApp({
+    template: '#app-template',
+    setup() {
+        const query = ref('');
+        const searching = ref(false);
+        const result = ref(null);
+        const showAll = ref(false);
+        const filterList = ref('');
+        const expanded = ref(null);
+
+        const hotTags = ['付款失败', '回单下载', '到账时间', '备注长度', '户名修改', '退押金', '误打款', 'OA审批'];
+
+        // 异步搜索
+        async function doSearch() {
+            if (!query.value.trim()) return;
+            searching.value = true;
+            result.value = null;
+            // 模拟一点延迟让用户感受到搜索
+            await new Promise(r => setTimeout(r, 150));
+            const matched = matchQA(query.value);
+            if (matched) {
+                result.value = { matched: true, data: matched };
+            } else {
+                const sug = suggestQA(query.value);
+                result.value = { matched: false, message: '没找到完全匹配的结果，以下是最接近的几个问题', suggestions: sug };
+            }
+            searching.value = false;
+        }
+
+        function searchTag(tag) {
+            query.value = tag;
+            doSearch();
+        }
+
+        function searchBySuggestion(s) {
+            query.value = s.keywords?.[0] || s.question;
+            doSearch();
+        }
+
+        const filteredAll = computed(() => {
+            const kw = filterList.value.trim();
+            if (!kw) return QA_DATA;
+            return QA_DATA.filter(item =>
+                item.question.includes(kw) ||
+                item.keywords.some(k => k.includes(kw)) ||
+                item.answer.includes(kw)
+            );
+        });
+
+        function toggleExpand(idx) {
+            expanded.value = expanded.value === idx ? null : idx;
+        }
+
+        return { query, searching, result, hotTags, showAll, filterList, expanded, filteredAll, doSearch, searchTag, searchBySuggestion, toggleExpand };
+    }
+});
+app.use(Vuetify.createVuetify({ theme: { defaultTheme: 'light' } }));
+app.mount('#app');
+</script>
+
+<script type="text/x-template" id="app-template">
+<v-app>
+    <v-app-bar color="primary" density="compact">
+        <v-app-bar-title>
+            <span class="material-symbols-outlined mr-2">smart_toy</span> 财务问答助手
+        </v-app-bar-title>
+        <template v-slot:append>
+            <v-btn variant="text" @click="showAll = !showAll">
+                <span class="material-symbols-outlined">{{ showAll ? 'search' : 'list' }}</span>
+            </v-btn>
+        </template>
+    </v-app-bar>
+
+    <v-main>
+        <v-container style="max-width: 720px;">
+            <!-- ====== 搜索模式 ====== -->
+            <template v-if="!showAll">
+                <v-card class="mt-4">
+                    <v-card-text>
+                        <v-text-field
+                            v-model="query"
+                            label="输入你的问题关键词"
+                            variant="outlined"
+                            clearable
+                            prepend-inner-icon="search"
+                            @keyup.enter="doSearch"
+                            :loading="searching"
+                            autofocus
+                        ></v-text-field>
+
+                        <v-btn color="primary" @click="doSearch" :loading="searching" class="mb-3">
+                            <span class="material-symbols-outlined mr-1" style="font-size:1.1em">search</span> 搜索
+                        </v-btn>
+
+                        <!-- 热门标签 -->
+                        <v-row class="mb-2">
+                            <v-col cols="12" class="py-1">
+                                <span class="text-caption text-grey mr-2">常见话题：</span>
+                                <v-chip
+                                    v-for="(tag, i) in hotTags" :key="i"
+                                    size="x-small" variant="outlined" color="primary"
+                                    class="mr-1 mb-1" @click="searchTag(tag)"
+                                >{{ tag }}</v-chip>
+                            </v-col>
+                        </v-row>
+
+                        <!-- 结果 -->
+                        <v-alert v-if="result" :type="result.matched ? 'success' : 'warning'"
+                                 variant="tonal" class="mt-2" closable @click:close="result = null">
+                            <template v-if="result.matched">
+                                <div class="font-weight-bold mb-2">{{ result.data.question }}</div>
+                                <div style="white-space: pre-wrap;">{{ result.data.answer }}</div>
+                            </template>
+                            <template v-else>
+                                <div>{{ result.message }}</div>
+                                <v-list v-if="result.suggestions" class="mt-2" density="compact" variant="plain">
+                                    <v-list-item
+                                        v-for="(s, i) in result.suggestions" :key="i"
+                                        @click="searchBySuggestion(s)" class="pa-1 suggestion-item"
+                                        style="cursor:pointer; border-radius:6px;" hover
+                                    >
+                                        <template v-slot:prepend>
+                                            <span class="material-symbols-outlined mr-2" style="color:#1565c0;font-size:1.1em">tips_and_updates</span>
+                                        </template>
+                                        <v-list-item-title class="text-body-2 font-weight-medium" style="color:#1565c0;">
+                                            {{ s.question }}
+                                        </v-list-item-title>
+                                    </v-list-item>
+                                </v-list>
+                            </template>
+                        </v-alert>
+                    </v-card-text>
+                </v-card>
+
+                <v-footer class="mt-4 text-center text-caption text-grey" style="justify-content:center;">
+                    提示：可以口语化提问，如"钱没到账"、"审批到哪里了"
+                </v-footer>
+            </template>
+
+            <!-- ====== 全部问答列表 ====== -->
+            <template v-else>
+                <v-card class="mt-4">
+                    <v-card-text>
+                        <v-text-field
+                            v-model="filterList" label="筛选问答"
+                            variant="outlined" prepend-inner-icon="filter_list"
+                            clearable class="mb-2"
+                        ></v-text-field>
+
+                        <v-list v-if="filteredAll.length > 0" lines="two">
+                            <template v-for="(item, idx) in filteredAll" :key="idx">
+                                <v-list-item @click="toggleExpand(idx)">
+                                    <template v-slot:prepend>
+                                        <v-chip color="primary" size="small">{{ idx + 1 }}</v-chip>
+                                    </template>
+                                    <v-list-item-title class="font-weight-medium">{{ item.question }}</v-list-item-title>
+                                    <v-list-item-subtitle class="text-caption">关键词：{{ item.keywords.join('、') }}</v-list-item-subtitle>
+                                    <template v-slot:append>
+                                        <span class="material-symbols-outlined">{{ expanded === idx ? 'expand_less' : 'expand_more' }}</span>
+                                    </template>
+                                </v-list-item>
+                                <v-expand-transition>
+                                    <div v-if="expanded === idx" class="pa-4 bg-grey-lighten-3">
+                                        <div style="white-space: pre-wrap;">{{ item.answer }}</div>
+                                    </div>
+                                </v-expand-transition>
+                                <v-divider v-if="idx < filteredAll.length - 1"></v-divider>
+                            </template>
+                        </v-list>
+                        <v-alert v-else type="info" variant="tonal">没有匹配的问答。</v-alert>
+                    </v-card-text>
+                </v-card>
+            </template>
+        </v-container>
+    </v-main>
+</v-app>
+</script>
+</body>
+</html>
