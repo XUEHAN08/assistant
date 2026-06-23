@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>财务问答助手</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#f5f5f5;color:#333;padding:16px;min-height:100vh}
+.container{max-width:700px;margin:0 auto}
+h1{font-size:20px;display:flex;align-items:center;gap:8px;margin-bottom:16px;color:#1565c0}
+.search-box{display:flex;gap:8px;margin-bottom:12px}
+.search-box input{flex:1;padding:10px 14px;border:1px solid #ccc;border-radius:8px;font-size:15px;outline:0;transition:.2s}
+.search-box input:focus{border-color:#1565c0;box-shadow:0 0 0 2px rgba(21,101,192,.15)}
+.search-box button{padding:10px 20px;background:#1565c0;color:#fff;border:none;border-radius:8px;font-size:15px;cursor:pointer;white-space:nowrap}
+.search-box button:disabled{opacity:.6;cursor:not-allowed}
+.tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.tags span{font-size:12px;color:#999;line-height:28px;margin-right:4px}
+.tag{padding:3px 12px;border:1px solid #1565c0;border-radius:14px;font-size:12px;color:#1565c0;cursor:pointer;transition:.2s}
+.tag:hover{background:#e3f2fd}
+.result-card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.08);margin-bottom:12px}
+.result-card .q{font-weight:600;color:#1565c0;margin-bottom:8px;font-size:15px}
+.result-card .a{white-space:pre-wrap;line-height:1.7;font-size:14px}
+.hint{text-align:center;color:#999;font-size:13px;margin-top:20px}
+.suggestion{display:flex;align-items:center;gap:8px;padding:8px 0;cursor:pointer;border-bottom:1px solid #eee;color:#1565c0;font-size:14px}
+.suggestion:hover{color:#0d47a1;text-decoration:underline}
+.suggestion:before{content:"💡";font-size:16px}
+.no-match{color:#e65100;margin-bottom:8px}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.toolbar a{color:#1565c0;cursor:pointer;font-size:13px;text-decoration:none}
+.toolbar a:hover{text-decoration:underline}
+.filter-box{margin-bottom:12px}
+.filter-box input{width:100%;padding:8px 12px;border:1px solid #ccc;border-radius:8px;font-size:14px;outline:0}
+.list-item{padding:12px;background:#fff;border-radius:8px;margin-bottom:6px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center}
+.list-item:hover{background:#fafafa}
+.list-item .num{background:#1565c0;color:#fff;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;margin-right:10px;flex-shrink:0}
+.list-item .q-text{flex:1;font-size:14px}
+.list-item .arrow{color:#999;font-size:12px}
+.list-detail{background:#f5f5f5;padding:14px;border-radius:0 0 8px 8px;margin-top:-6px;margin-bottom:6px;white-space:pre-wrap;line-height:1.7;font-size:13px}
+.fade-in{animation:fadeIn .25s}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div class="container" id="app">
+    <div class="toolbar">
+        <h1><span>🤖</span> 财务问答助手</h1>
+        <a id="toggleView" onclick="toggleView()">📋 全部问答</a>
+    </div>
+
+    <!-- 搜索模式 -->
+    <div id="searchMode">
+        <div class="search-box">
+            <input id="searchInput" type="text" placeholder="输入你的问题关键词…" onkeydown="if(event.key==='Enter')doSearch()">
+            <button id="searchBtn" onclick="doSearch()">搜索</button>
+        </div>
+
+        <div class="tags">
+            <span>常见话题：</span>
+            <span class="tag" onclick="searchTag(this.textContent)">付款失败</span>
+            <span class="tag" onclick="searchTag(this.textContent)">回单下载</span>
+            <span class="tag" onclick="searchTag(this.textContent)">到账时间</span>
+            <span class="tag" onclick="searchTag(this.textContent)">备注长度</span>
+            <span class="tag" onclick="searchTag(this.textContent)">户名修改</span>
+            <span class="tag" onclick="searchTag(this.textContent)">退押金</span>
+            <span class="tag" onclick="searchTag(this.textContent)">误打款</span>
+            <span class="tag" onclick="searchTag(this.textContent)">OA审批</span>
+        </div>
+
+        <div id="resultArea"></div>
+        <div class="hint">💡 可以口语化提问，如"钱没到账"、"审批到哪里了"</div>
+    </div>
+
+    <!-- 全部问答模式 -->
+    <div id="listMode" style="display:none">
+        <div class="filter-box">
+            <input id="filterInput" type="text" placeholder="筛选关键词…" oninput="renderList()">
+        </div>
+        <div id="listArea"></div>
+    </div>
+</div>
+
+<script>
+// ==================== QA 数据 ====================
+const QA = [
+    {k:["OA付款日期","最早支付日期","提前付款","最早什么时候能付款","OA哪天付款","付款时间"],q:"OA付款日期以什么为准？如何申请提前付款？",a:"财务付款以OA最早支付日期为准，如遇节假日/周末则顺延下一工作日。\n\n如需提前支付，有两种方式：\n1️⃣ 退回至申请人修改日期，重走OA审批流程\n2️⃣ 发邮件给BUFC说明情况申请提前付款，同时抄送 paymentsupport@trip.com 及财务付款节点的处理人"},
+    {k:["OA付款失败","付款失败","账户信息错误","账号错误","付款不成功","付款被拒","付款退回","打款失败"],q:"OA付款失败怎么办？",a:"多数情况因收款账户信息错误导致。请检查户名/账号/开户行是否正确：\n\n❌ 不正确 → 在付款失败OA单详情页点击「创建付款失败账号变更单」填写正确信息后提交\n✅ 正确 → 联系资金部 PaymentSupport@trip.com 邮箱说明情况排查原因"},
+    {k:["合同付款单","合同付款失败","采购合同","合同付款","直连付款失败"],q:"合同付款单付款失败怎么处理？",a:"① 先创建「付款失败账号变更单」重新发起付款\n② 如果后续还要提交合同付款单支付剩余款项，务必先提交「采购合同账户信息变更单」修改采购合同评审单中的收款账户信息\n\n⚠️ 否则后续仍会直连付款失败！"},
+    {k:["业务款付款失败","其他来源付款失败","单据日志","支付异常","BU结算","支付失败"],q:"其他来源业务款付款失败怎么办？",a:"请至单据日志页面查看原因：\n\n📌 显示「支付失败」（账号长度非法/户名错误/账号校验错等）\n→ 联系供应商及开户行核对账户信息（户名、账号、开户行到支行、联行号）\n\n📌 显示「支付异常」（Over the limit time updated to C）\n→ 邮件联系对应资金同事"},
+    {k:["付款水单","回单下载","银行回单","付款回单","电子回单","水单","怎么下载回单"],q:"如何下载付款回单/水单？",a:"📄 OA回单：收到飞书/邮件付款成功的消息后，等待 20-60 分钟，根据通知指引自行下载\n\n📄 其他来源业务款回单：联系BU财务结算至资金流水池下载"},
+    {k:["到账时间","多久到账","未到账","什么时候到账","几天到账","到账"],q:"付款后多久到账？",a:"一般 3 天内到账，具体看各银行处理速度。"},
+    {k:["账户填错","支付成功未到账","户名错误","钱没到账","账号填错","信息错误但支付成功","系统显示成功没收到钱"],q:"账户信息填错但显示支付成功，钱没到账怎么办？",a:"🔹 OA：等待飞书/邮件返回失败信息，按指引提交付款失败变更单；若 3 天内没有返回失败，请联系审批最后节点的财务付款同事\n\n🔹 其他来源业务款：BU结算前往「银行明细查询」查询是否有退单（退单一般 1-3 天）\n  - 有退单记录：提供付款单号及退单记录发邮件给对应资金同事\n  - 无退单记录：联系供应商提供账户交易明细邮件至对应资金同事"},
+    {k:["备注长度","备注限制","备注字符","备注20","字符限制","备注字数"],q:"OA付款备注的长度有什么要求？",a:"最多支持 20 个字符\n• 1 个中文 = 2 个字符\n• 1 个英文/数字/符号 = 1 个字符\n\n例如：「携程*AB12」= 9 个字符\n\n若备注超过限制，请及时查看OA并回复会签。"},
+    {k:["个人户名","修改户名","户名有误","户名不对","报销户名","HR系统户名"],q:"报销信息中的个人户名有误，如何修改？",a:"员工本人户名从HR系统获取，无法自行修改。\n\n请在以下链接申请修改：\nhttp://iquality.ctripcorp.com/feedback/submit?pid=9&typeId=1846"},
+    {k:["开户行","联行号","查询开户行","开户行信息","支行信息"],q:"如何查询开户行联行号等信息？",a:"请新建一个费用报销单，按下单中红色字体/方框指示进行查询。"},
+    {k:["审批流","预计审批人","审批节点","OA审批","当前审批人","审批到哪了","查看审批"],q:"如何查询OA审批流？",a:"在表单详情页的「状态」字段中，点击「查看预计审批人」，就可以看到待审批的节点和当前审批人。"},
+    {k:["公司税号","税号","开票信息","发票抬头","纳税人识别号"],q:"如何查询公司税号等信息？",a:"在飞书搜索「财务税号」即可查询相关信息。"},
+    {k:["误打款","退回错误汇款","误打","打错了","汇错了","多打了"],q:"供应商/个人误打款，如何申请退回？",a:"在OA系统提交「综合业务付款单」，业务类型选择「退回错误汇款」。"},
+    {k:["退押金","退保证金","押金","保证金","押金怎么退"],q:"如何申请退押金/保证金？",a:"在OA系统提交「综合业务付款单」，业务类型选择「退回押金/保证金/本金」。"},
+    {k:["发票","发票审核","发票问题","发票审核员","发票怎么开"],q:"发票相关问题找谁？",a:"联系发票审核员（可查看OA审批流中的发票节点）或 BU 财务。"},
+    {k:["退回报销款","部分报销款","退还报销","退款给公司","报销退钱"],q:"需要退回部分报销款给公司怎么办？",a:"① 申请人网页端打开OA\n② 找到电子回单部分\n③ 按回单里的公司信息，原路退还公司\n④ 告知对应公司的账务同事"},
+    {k:["退单记录","银行退单","退单查询","退单","被银行退回了"],q:"如何查询退单记录？",a:"BU结算前往「银行明细查询」查询是否有退单，退单一般需要 1-3 天。\n\n🔹 如有退单记录：提供付款单号及退单记录发邮件给对应资金同事\n🔹 如确认无退单记录：联系供应商提供账户交易明细邮件至对应资金同事"}
+];
+
+// ==================== 匹配引擎 ====================
+function bigram(s){const c=[...s].filter(c=>c>='一'&&c<='鿿'),bg=new Set();for(let i=0;i<c.length-1;i++)bg.add(c[i]+c[i+1]);return bg}
+function matchQA(text){
+    const t=text.trim();if(!t)return null;
+    function skw(t,item){let s=0;for(const k of item.k)if(t.includes(k))s+=Math.min(k.length/2,20);return s}
+    function sco(t,st){const tc=new Set([...t].filter(c=>c>='一'&&c<='鿿'||/[a-zA-Z0-9]/.test(c)));if(!tc.size)return 0;const sc=new Set(st);const o=[...tc].filter(c=>sc.has(c)).length;return o/tc.size*100+o*.5}
+    function sbg(t,st){const ib=bigram(t);if(!ib.size)return 0;const sb=bigram(st);return [...ib].filter(b=>sb.has(b)).length/ib.size*100}
+    function sfz(t,st){const tc=new Set([...t].filter(c=>c>='一'&&c<='鿿'||/[a-zA-Z0-9]/.test(c)));if(!tc.size)return 0;const sc=new Set(st);return [...tc].filter(c=>sc.has(c)).length/tc.size*100}
+    const scored=QA.map(item=>{const st=item.k.join(' ')+' '+item.q;const t1=skw(t,item),t2=sco(t,st),t3=sbg(t,st),t4=sfz(t,st);return{total:t1*2+t2*.3+t3*.6+t4*.5,item}});
+    scored.sort((a,b)=>b.total-a.total);
+    return scored[0]?.total>=6?scored[0].item:null;
+}
+function suggestQA(text,n=3){
+    const t=text.trim();if(!t)return[];
+    function sco(t,st){const tc=new Set([...t].filter(c=>c>='一'&&c<='鿿'||/[a-zA-Z0-9]/.test(c)));if(!tc.size)return 0;const sc=new Set(st);return[...tc].filter(c=>sc.has(c)).length/tc.size*100}
+    function sbg(t,st){const ib=bigram(t);if(!ib.size)return 0;return[...ib].filter(b=>bigram(st).has(b)).length/ib.size*100}
+    function sfz(t,st){const tc=new Set([...t].filter(c=>c>='一'&&c<='鿿'||/[a-zA-Z0-9]/.test(c)));if(!tc.size)return 0;const sc=new Set(st);return[...tc].filter(c=>sc.has(c)).length/tc.size*100}
+    const scored=QA.map(item=>{const st=item.k.join(' ')+' '+item.q;return{total:sbg(t,st)*.5+sfz(t,st)*.3+sco(t,st)*.2,item}});
+    scored.sort((a,b)=>b.total-a.total);
+    return scored.filter(s=>s.total>10).slice(0,n).map(s=>s.item);
+}
+
+// ==================== UI 逻辑 ====================
+let isListMode=false;
+
+function toggleView(){
+    isListMode=!isListMode;
+    document.getElementById('searchMode').style.display=isListMode?'none':'block';
+    document.getElementById('listMode').style.display=isListMode?'block':'none';
+    document.getElementById('toggleView').textContent=isListMode?'🔍 返回搜索':'📋 全部问答';
+    if(isListMode)renderList();
+}
+
+function doSearch(){
+    const input=document.getElementById('searchInput');
+    const btn=document.getElementById('searchBtn');
+    const area=document.getElementById('resultArea');
+    const text=input.value.trim();
+    if(!text)return;
+    btn.disabled=true;
+    btn.textContent='搜索中…';
+    area.innerHTML='';
+
+    setTimeout(()=>{
+        const matched=matchQA(text);
+        if(matched){
+            area.innerHTML=`
+                <div class="result-card fade-in">
+                    <div class="q">${esc(matched.q)}</div>
+                    <div class="a">${esc(matched.a)}</div>
+                </div>`;
+        }else{
+            const sug=suggestQA(text);
+            let html=`<div class="result-card fade-in"><div class="no-match">😕 没找到完全匹配的</div>`;
+            if(sug.length){
+                html+=`<div style="font-size:13px;color:#666;margin-bottom:6px">以下是最接近的几个问题：</div>`;
+                sug.forEach(s=>{
+                    html+=`<div class="suggestion" onclick="searchBySuggestion('${escAttr(s.k[0]||s.q)}')">${esc(s.q)}</div>`;
+                });
+            }else{
+                html+=`<div style="font-size:13px;color:#999">换个关键词试试吧</div>`;
+            }
+            html+=`</div>`;
+            area.innerHTML=html;
+        }
+        btn.disabled=false;
+        btn.textContent='搜索';
+    },120);
+}
+
+function searchTag(tag){
+    document.getElementById('searchInput').value=tag;
+    doSearch();
+}
+
+function searchBySuggestion(kw){
+    document.getElementById('searchInput').value=kw;
+    doSearch();
+}
+
+let expandedIdx=null;
+
+function renderList(){
+    const kw=document.getElementById('filterInput').value.trim().toLowerCase();
+    const filtered=kw?QA.filter(item=>item.q.includes(kw)||item.k.some(k=>k.includes(kw))||item.a.includes(kw)):QA;
+    const area=document.getElementById('listArea');
+    if(!filtered.length){
+        area.innerHTML='<div style="color:#999;text-align:center;padding:20px">没有匹配的问答。</div>';
+        return;
+    }
+    let html='';
+    filtered.forEach((item,i)=>{
+        const idx=QA.indexOf(item);
+        html+=`
+            <div class="list-item" onclick="toggleDetail(${idx},this)">
+                <div><span class="num">${i+1}</span><span class="q-text">${esc(item.q)}</span></div>
+                <span class="arrow">▶</span>
+            </div>
+            <div id="detail_${idx}" class="list-detail" style="display:none">${esc(item.a)}</div>`;
+    });
+    area.innerHTML=html;
+}
+
+function toggleDetail(idx,el){
+    const detail=document.getElementById('detail_'+idx);
+    // 关闭之前的
+    if(expandedIdx!==null&&expandedIdx!==idx){
+        const prev=document.getElementById('detail_'+expandedIdx);
+        if(prev)prev.style.display='none';
+    }
+    detail.style.display=detail.style.display==='none'?'block':'none';
+    expandedIdx=detail.style.display==='block'?idx:null;
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function escAttr(s){return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+// 自动聚焦
+document.getElementById('searchInput').focus();
+</script>
+</body>
+</html>
